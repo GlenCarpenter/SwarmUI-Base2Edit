@@ -112,7 +112,7 @@ internal static class WorkflowTestHarness
     public static WorkflowGenerator.WorkflowGenStep MinimalGraphSeedStep() =>
         new(g =>
         {
-            using SyncingWorkflowBridge bridge = BridgeSync.For(g);
+            using WorkflowBridge bridge = BridgeSync.For(g);
             UnknownNode model = bridge.AddStub("UnitTest_Model", "4")
                 .WithOutputs(WGNodeData.DT_MODEL, "CLIP", WGNodeData.DT_VAE);
             UnknownNode latent = bridge.AddStub("UnitTest_Latent", "10")

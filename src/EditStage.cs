@@ -1,4 +1,5 @@
 using ComfyTyped.Core;
+using ComfyTyped.Families;
 using ComfyTyped.Generated;
 using Newtonsoft.Json.Linq;
 using SwarmUI.Builtin_ComfyUIBackend;
@@ -331,16 +332,14 @@ public class EditStage
                 return true;
             }
 
-            if (node is VAEDecodeNode or VAEDecodeTiledNode)
+            if (node is IVaeDecode d)
             {
                 anchorImageOut = new JArray(node.Id, 0);
-                INodeOutput samplesConn = node.FindInput("samples")?.Connection
-                                          ?? node.FindInput("latent")?.Connection;
-                if (samplesConn is not null)
+                if (d.Samples.Connection is INodeOutput samplesConn)
                 {
                     anchorSamples = new JArray(samplesConn.Node.Id, samplesConn.SlotIndex);
                 }
-                if (node.FindInput("vae")?.Connection is INodeOutput vaeConn)
+                if (d.Vae.Connection is INodeOutput vaeConn)
                 {
                     anchorVae = new JArray(vaeConn.Node.Id, vaeConn.SlotIndex);
                 }
@@ -426,7 +425,7 @@ public class EditStage
         }
 
         if (imageOut.Path?.Count == 2
-            && bridge.Graph.GetNode($"{imageOut.Path[0]}") is ComfyNode node)
+            && bridge.NodeAt(imageOut.Path) is ComfyNode node)
         {
             int? widthFromNode = node.FindInput("width").LiteralAsInt();
             int? heightFromNode = node.FindInput("height").LiteralAsInt();

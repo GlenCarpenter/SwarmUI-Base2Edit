@@ -3,6 +3,7 @@ using SwarmUI.Builtin_ComfyUIBackend;
 using SwarmUI.Text2Image;
 using SwarmUI.Utils;
 using ComfyTyped.Core;
+using ComfyTyped.Families;
 using Image = SwarmUI.Utils.Image;
 
 namespace Base2Edit;
@@ -222,7 +223,7 @@ public class StageResolver(WorkflowGenerator g, StageRefStore store)
         {
             if (VaeNodeReuse.ReuseVaeEncodeForImage(g, media.Path, targetVae.Path, out INodeOutput reusedEncoded))
             {
-                return CloneNodeRef(WorkflowBridge.ToPath(reusedEncoded));
+                return CloneNodeRef(reusedEncoded.ToPath());
             }
 
             return CloneNodeRef(media.AsLatentImage(targetVae).Path);
@@ -242,7 +243,7 @@ public class StageResolver(WorkflowGenerator g, StageRefStore store)
         WGNodeData pixels = ToPixels(media, sourceVae);
         if (VaeNodeReuse.ReuseVaeEncodeForImage(g, pixels.Path, targetVae.Path, out INodeOutput reusedLatent))
         {
-            return CloneNodeRef(WorkflowBridge.ToPath(reusedLatent));
+            return CloneNodeRef(reusedLatent.ToPath());
         }
 
         return CloneNodeRef(pixels.AsLatentImage(targetVae).Path);
@@ -284,19 +285,15 @@ public class StageResolver(WorkflowGenerator g, StageRefStore store)
             return null;
         }
 
-        if (g.Workflow[$"{media.Path[0]}"] is JObject latentNode
-            && (string)latentNode["class_type"] is string ct
-            && (ct == "VAEEncode" || ct == "VAEEncodeTiled")
-            && latentNode["inputs"] is JObject latentInputs
-            && latentInputs["pixels"] is JArray pixels
-            && pixels.Count == 2)
+        using WorkflowBridge bridge = WorkflowBridge.Create(g.Workflow);
+        if (bridge.NodeAt(media.Path) is IVaeEncode enc && enc.Pixels.Connection is INodeOutput px)
         {
-            return (JArray)pixels.DeepClone();
+            return NodeRef.Of(px).ToJArray();
         }
 
         if (VaeNodeReuse.ReuseVaeDecodeForSamples(g, media.Path, out INodeOutput reusedImage))
         {
-            return WorkflowBridge.ToPath(reusedImage);
+            return reusedImage.ToPath();
         }
 
         return null;

@@ -1,4 +1,5 @@
 using ComfyTyped.Core;
+using ComfyTyped.Families;
 using ComfyTyped.Generated;
 using ComfyTyped.Types;
 using Newtonsoft.Json.Linq;
@@ -28,7 +29,7 @@ public static class VaeNodeReuse
         }
 
         using WorkflowBridge bridge = WorkflowBridge.Create(g.Workflow);
-        ComfyNode decode = bridge.Graph.GetNode($"{imageRef[0]}");
+        ComfyNode decode = bridge.NodeAt(imageRef);
 
         INodeOutput intendedVae = bridge.ResolvePath(intendedVaeRef);
         INodeOutput samples = bridge.ResolvePath(samplesRef);
@@ -37,23 +38,13 @@ public static class VaeNodeReuse
             return false;
         }
 
-        if (decode is VAEDecodeNode typedDecode)
+        if (decode is IVaeDecode d)
         {
-            if (bridge.Graph.FindInputsConnectedTo(typedDecode.IMAGE).Count > 0)
+            if (bridge.Graph.FindInputsConnectedTo(d.IMAGE).Count > 0)
             {
                 return false;
             }
-            return TryRetarget(typedDecode.Samples, typedDecode.Vae, typedDecode.IMAGE,
-                intendedVae, samples, out imageOut);
-        }
-
-        if (decode is VAEDecodeTiledNode typedTiled)
-        {
-            if (bridge.Graph.FindInputsConnectedTo(typedTiled.IMAGE).Count > 0)
-            {
-                return false;
-            }
-            return TryRetarget(typedTiled.Samples, typedTiled.Vae, typedTiled.IMAGE,
+            return TryRetarget(d.Samples, d.Vae, d.IMAGE,
                 intendedVae, samples, out imageOut);
         }
 

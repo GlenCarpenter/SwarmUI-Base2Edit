@@ -1,4 +1,5 @@
 using ComfyTyped.Core;
+using ComfyTyped.SwarmUI;
 using FreneticUtilities.FreneticExtensions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -92,11 +93,10 @@ public class StageRefStore(WorkflowGenerator g)
         }
         string dataType = !string.IsNullOrEmpty(parts[2]) ? parts[2] : fallbackDataType;
         T2IModelCompatClass compat = ResolveCompatFor(dataType, fallbackVae, parts[5]);
-        return new WGNodeData(WorkflowBridge.ToPath(output), g, dataType, compat)
-        {
-            Width = Nullable(parts[3]),
-            Height = Nullable(parts[4])
-        };
+        WGNodeData result = output.ToWGNodeData(g, dataType, compat);
+        result.Width = !string.IsNullOrEmpty(parts[3]) && int.TryParse(parts[3], out int w) ? w : null;
+        result.Height = !string.IsNullOrEmpty(parts[4]) && int.TryParse(parts[4], out int h) ? h : null;
+        return result;
     }
 
     private StageRef GetIfCaptured(StageKind kind, int? index = null) =>
@@ -263,7 +263,4 @@ public class StageRefStore(WorkflowGenerator g)
     }
 
     public static string FormatStageLabel(int stageIndex) => $"{EditStagePrefix}{stageIndex}";
-
-    private static int? Nullable(string s) =>
-        !string.IsNullOrEmpty(s) && int.TryParse(s, out int v) ? v : null;
 }
