@@ -189,6 +189,7 @@ internal static class Base2EditSpecParser
             }
         }
 
+        ApplyParamOverrides(g.UserInput, obj, stageId, BuildAncestorSections(parentKind, parentStageId, stagesById));
         (T2IModel resolvedModel, ModelSource modelSource) = ResolveStageModel(g, obj, locationPrefix);
         T2IModel resolvedVae = ResolveStageVae(obj, locationPrefix);
 
@@ -458,6 +459,68 @@ internal static class Base2EditSpecParser
 
     private static bool JsonHasOwnProperty(JObject obj, string key) =>
         obj.Properties().Any(p => StringUtils.Equals(p.Name, key));
+
+    private static readonly (T2IParamType Param, string CardKey)[] OverridableParams =
+    [
+        (Base2EditExtension.KeepPreEditImage.Type, "KeepPreEditImage"),
+        (Base2EditExtension.EditRefineOnly.Type, "RefineOnly"),
+        (Base2EditExtension.EditControl.Type, "Control"),
+        (Base2EditExtension.EditModel.Type, "Model"),
+        (Base2EditExtension.EditVAE.Type, "Vae"),
+        (Base2EditExtension.EditUpscale.Type, "Upscale"),
+        (Base2EditExtension.EditUpscaleMethod.Type, "UpscaleMethod"),
+        (Base2EditExtension.EditSteps.Type, "Steps"),
+        (Base2EditExtension.EditCFGScale.Type, "CfgScale"),
+        (Base2EditExtension.EditSampler.Type, "Sampler"),
+        (Base2EditExtension.EditScheduler.Type, "Scheduler"),
+    ];
+
+    private static void ApplyParamOverrides(T2IParamInput input, JObject card, int stageId, List<int> ancestorSections)
+    {
+        List<int> ownSection = [Base2EditExtension.EditSectionIdForStage(stageId)];
+        foreach ((T2IParamType param, string cardKey) in OverridableParams)
+        {
+            if (!JsonHasOwnProperty(card, cardKey) && TryReadOverride(input, ancestorSections, param, out string inherited))
+            {
+                card[cardKey] = inherited;
+            }
+            if (TryReadOverride(input, ownSection, param, out string own))
+            {
+                card[cardKey] = own;
+            }
+        }
+    }
+
+    private static List<int> BuildAncestorSections(ParentKind parentKind, int parentStageId, Dictionary<int, StageSpec> stagesById)
+    {
+        List<int> sections = [];
+        ParentKind kind = parentKind;
+        int id = parentStageId;
+        while (kind == ParentKind.Edit && stagesById.TryGetValue(id, out StageSpec ancestor))
+        {
+            sections.Add(Base2EditExtension.EditSectionIdForStage(id));
+            kind = ancestor.ParentKind;
+            id = ancestor.ParentStageId;
+        }
+        sections.Add(Base2EditExtension.SectionID_Edit);
+        return sections;
+    }
+
+    private static bool TryReadOverride(T2IParamInput input, List<int> sections, T2IParamType param, out string value)
+    {
+        foreach (int section in sections)
+        {
+            if (input.SectionParamOverrides.TryGetValue(section, out T2IParamSet set)
+                && set.ValuesInput.TryGetValue(param.ID, out object raw)
+                && raw is not null)
+            {
+                value = raw is T2IModel model ? model.Name : $"{raw}";
+                return true;
+            }
+        }
+        value = null;
+        return false;
+    }
 
     private sealed class LoraInputsSnapshot
     {

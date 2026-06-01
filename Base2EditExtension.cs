@@ -85,7 +85,9 @@ public class Base2EditExtension : Extension
             Name: "Base2Edit",
             Description: "Applies an edit stage to your generated image using the <edit> prompt section.\n"
                 + "For multi-stage workflows you can also target a specific edit stage with <edit[n]> (0-indexed).\n"
-                + "If no <edit> / <edit[n]> section is provided for a stage, that stage falls back to the global prompt.",
+                + "If no <edit> / <edit[n]> section is provided for a stage, that stage falls back to the global prompt.\n"
+                + "Edit params can be overridden per stage from inside the prompt, e.g. <edit[1]>...<param[editmodel]:my-model> or <param[editsteps]:30>. "
+                + "An override set in <edit> applies to all stages; one in <edit[n]> applies to stage n and its child stages, which can override it again.",
             Toggles: true,
             Open: false,
             OrderPriority: -2.9
@@ -98,7 +100,8 @@ public class Base2EditExtension : Extension
             Default: "false",
             Group: Base2EditGroup,
             OrderPriority: 1,
-            FeatureFlag: "comfyui"
+            FeatureFlag: "comfyui",
+            CanSectionalize: true
         ));
 
         EditRefineOnly = T2IParamTypes.Register<bool>(new T2IParamType(
@@ -107,7 +110,8 @@ public class Base2EditExtension : Extension
             Default: "false",
             Group: Base2EditGroup,
             OrderPriority: 1.5,
-            FeatureFlag: "comfyui"
+            FeatureFlag: "comfyui",
+            CanSectionalize: true
         ));
 
         ApplyEditAfter = T2IParamTypes.Register<string>(new T2IParamType(
@@ -134,7 +138,8 @@ public class Base2EditExtension : Extension
             ViewType: ParamViewType.SLIDER,
             Group: Base2EditGroup,
             OrderPriority: 3,
-            FeatureFlag: "comfyui"
+            FeatureFlag: "comfyui",
+            CanSectionalize: true
         ));
 
         EditUpscale = T2IParamTypes.Register<double>(new T2IParamType(
@@ -151,6 +156,7 @@ public class Base2EditExtension : Extension
             Group: Base2EditGroup,
             OrderPriority: 4,
             FeatureFlag: "comfyui",
+            CanSectionalize: true,
             DoNotPreview: true
         ));
 
@@ -161,6 +167,7 @@ public class Base2EditExtension : Extension
             Group: Base2EditGroup,
             OrderPriority: 5,
             FeatureFlag: "comfyui",
+            CanSectionalize: true,
             ChangeWeight: 1,
             GetValues: (_) => ComfyUIBackendExtension.UpscalerModels,
             DependNonDefault: EditUpscale.Type.ID
@@ -181,6 +188,7 @@ public class Base2EditExtension : Extension
             Group: Base2EditGroup,
             OrderPriority: 6,
             FeatureFlag: "comfyui",
+            CanSectionalize: true,
             ChangeWeight: 9,
             DoNotPreview: true
         ));
@@ -201,6 +209,7 @@ public class Base2EditExtension : Extension
             Group: Base2EditGroup,
             OrderPriority: 7,
             FeatureFlag: "comfyui",
+            CanSectionalize: true,
             ChangeWeight: 7,
             DoNotPreview: true,
             Toggleable: true,
@@ -218,7 +227,8 @@ public class Base2EditExtension : Extension
             ViewType: ParamViewType.SLIDER,
             Group: Base2EditGroup,
             OrderPriority: 8,
-            FeatureFlag: "comfyui"
+            FeatureFlag: "comfyui",
+            CanSectionalize: true
         ));
 
         EditCFGScale = T2IParamTypes.Register<double>(new T2IParamType(
@@ -233,6 +243,7 @@ public class Base2EditExtension : Extension
             Group: Base2EditGroup,
             OrderPriority: 9,
             FeatureFlag: "comfyui",
+            CanSectionalize: true,
             ChangeWeight: -3,
             Toggleable: true
         ));
@@ -245,6 +256,7 @@ public class Base2EditExtension : Extension
             Group: Base2EditGroup,
             OrderPriority: 10,
             FeatureFlag: "comfyui",
+            CanSectionalize: true,
             Toggleable: true
         ));
 
@@ -256,6 +268,7 @@ public class Base2EditExtension : Extension
             Group: Base2EditGroup,
             OrderPriority: 11,
             FeatureFlag: "comfyui",
+            CanSectionalize: true,
             Toggleable: true
         ));
 
