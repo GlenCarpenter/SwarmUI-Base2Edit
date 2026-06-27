@@ -344,6 +344,7 @@ class StageRunner(WorkflowGenerator g, StageRefStore store)
         (model, clip, vae) = ResolveModelStack(ctx.Stage.ModelSource, editModel, isFinalStep, stageSectionId, model, clip, vae);
         (vae, mustReencode) = ResolveVae(ctx.Stage, isFinalStep, vae, mustReencode);
         (model, clip) = ApplyLoraStack(ctx.Stage, stageSectionId, model, clip);
+        BridgeSync.SyncLastId(g);
 
         if (mustReencode
             && preEditVae is not null
