@@ -11,6 +11,7 @@ public class Base2EditExtension : Extension
 {
     public const int SectionID_Edit = 48723;
     public const int EditSeedOffset = 2;
+    public const string SeedVR2ModelParamName = "SeedVR2 Model";
     public static int EditSectionIdForStage(int stageIndex) => SectionID_Edit + 1 + stageIndex;
     public static T2IParamGroup Base2EditGroup;
     public static T2IRegisteredParam<bool> KeepPreEditImage;
@@ -63,6 +64,24 @@ public class Base2EditExtension : Extension
         }
         WorkflowGenerator.AddStep(g => new Runner(g).Run(isFinalStep: false), -4.2);
         WorkflowGenerator.AddStep(g => new Runner(g).Run(isFinalStep: true), 5.9);
+        WorkflowGenerator.AddStep(g => new Runner(g).RunSeedVR2Phase(), 6.5);
+    }
+
+    public override void OnPreLaunch()
+    {
+        if (!SeedVR2Detected() || ApplyEditAfter?.Type is null || ApplyEditAfter.Type.VisibleNormally)
+        {
+            return;
+        }
+
+        T2IParamType visible = ApplyEditAfter.Type with { VisibleNormally = true };
+        T2IParamTypes.Types[visible.ID] = visible;
+        ApplyEditAfter = new T2IRegisteredParam<string>(visible);
+    }
+
+    public static bool SeedVR2Detected()
+    {
+        return T2IParamTypes.Types.ContainsKey(T2IParamTypes.CleanTypeName(SeedVR2ModelParamName));
     }
 
     private static void HandlePostGenerateMetadata(T2IEngine.PostGenerationEventParams evt)
@@ -116,9 +135,11 @@ public class Base2EditExtension : Extension
 
         ApplyEditAfter = T2IParamTypes.Register<string>(new T2IParamType(
             Name: "Apply Edit After",
-            Description: "Where to inject the edit stage.",
+            Description: "Where to inject the edit stage.\n"
+                + "'Refiner' edits the final image after the base/refiner stage.\n"
+                + "'SeedVR2' edits the image after SeedVR2 has upscaled it.",
             Default: "Refiner",
-            GetValues: (_) => ["Refiner"],
+            GetValues: (_) => SeedVR2Detected() ? ["Refiner", "SeedVR2"] : ["Refiner"],
             Group: Base2EditGroup,
             OrderPriority: 2,
             FeatureFlag: "comfyui",

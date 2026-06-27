@@ -16,6 +16,17 @@ public class Runner(WorkflowGenerator g)
         new EditStage(g, store).Run(isFinalStep);
     }
 
+    public void RunSeedVR2Phase()
+    {
+        if (!IsExtensionActive())
+        {
+            return;
+        }
+
+        StageRefStore store = new(g);
+        new EditStage(g, store).RunSeedVR2Phase();
+    }
+
     private bool IsExtensionActive()
     {
         T2IParamType type = Base2EditExtension.EditModel?.Type;

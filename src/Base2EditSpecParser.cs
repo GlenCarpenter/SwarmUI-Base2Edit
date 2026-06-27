@@ -11,6 +11,10 @@ internal static class Base2EditSpecParser
 {
     private const string ApplyAfterBase = "Base";
     private const string ApplyAfterRefiner = "Refiner";
+    private const string ApplyAfterSeedVR2 = "SeedVR2";
+    private const string SeedVR2VideoFileParamName = "SeedVR2 Video File";
+    private const string SeedVR2ImageFileParamName = "SeedVR2 Image File";
+    private const string SeedVR2UpscaleStageParamName = "SeedVR2 Upscale Stage";
     private const double DefaultUpscale = 1.0;
     private const string DefaultUpscaleMethod = "pixel-lanczos";
     private const int DefaultSteps = 20;
@@ -20,6 +24,7 @@ internal static class Base2EditSpecParser
     public static List<StageSpec> Parse(WorkflowGenerator g)
     {
         bool hasRefinerPhaseWork = HasRefinerStageConfigured(g) || HasSegmentApplyAfterRefiner(g);
+        bool seedVr2WillUpscale = HasSeedVR2UpscalePhase(g);
 
         Dictionary<int, StageSpec> stagesById = [];
         List<int> orderedIds = [];
@@ -42,6 +47,7 @@ internal static class Base2EditSpecParser
                 stageId,
                 previousStage,
                 hasRefinerPhaseWork,
+                seedVr2WillUpscale,
                 stagesById,
                 posPrompt,
                 negPrompt,
@@ -97,6 +103,7 @@ internal static class Base2EditSpecParser
         string applyAfterRaw = g.UserInput.Get(Base2EditExtension.ApplyEditAfter);
         string applyAfter = StringUtils.Equals(applyAfterRaw, ApplyAfterBase)
                 || StringUtils.Equals(applyAfterRaw, ApplyAfterRefiner)
+                || StringUtils.Equals(applyAfterRaw, ApplyAfterSeedVR2)
             ? applyAfterRaw
             : ApplyAfterRefiner;
 
@@ -151,6 +158,7 @@ internal static class Base2EditSpecParser
         int stageId,
         StageSpec previousStage,
         bool hasRefinerPhaseWork,
+        bool seedVr2WillUpscale,
         Dictionary<int, StageSpec> stagesById,
         string posPrompt,
         string negPrompt,
@@ -168,6 +176,10 @@ internal static class Base2EditSpecParser
         string applyAfterRaw = GetOptionalString(obj, "ApplyAfter", defaultApplyAfterStr, locationPrefix, allowEmpty: false);
         (ParentKind parentKind, int parentStageId) = NormalizeApplyAfter(applyAfterRaw, stageId, locationPrefix);
 
+        if (!seedVr2WillUpscale && parentKind == ParentKind.SeedVR2)
+        {
+            parentKind = ParentKind.Refiner;
+        }
         if (!hasRefinerPhaseWork && parentKind == ParentKind.Refiner)
         {
             parentKind = ParentKind.Base;
@@ -321,12 +333,78 @@ internal static class Base2EditSpecParser
         {
             return (ParentKind.Refiner, -1);
         }
+        if (StringUtils.Equals(applyAfter, ApplyAfterSeedVR2))
+        {
+            return (ParentKind.SeedVR2, -1);
+        }
         if (StageRefStore.TryParseStageIndexKey(applyAfter, out int parentId))
         {
             return (ParentKind.Edit, parentId);
         }
         throw new SwarmUserErrorException(
             $"Base2Edit: {locationPrefix} has invalid Apply After '{applyAfterRaw}'.");
+    }
+
+    private static bool HasSeedVR2UpscalePhase(WorkflowGenerator g)
+    {
+        if (!IsSisterParamSet(g, Base2EditExtension.SeedVR2ModelParamName))
+        {
+            return false;
+        }
+        if (HasNonEmptySisterValue(g, SeedVR2VideoFileParamName)
+            || HasNonEmptySisterValue(g, SeedVR2ImageFileParamName))
+        {
+            return false;
+        }
+        if (IsVideoGenerationRequest(g) && !SeedVR2UpscalesBeforeVideo(g))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool IsSisterParamSet(WorkflowGenerator g, string paramName)
+    {
+        return T2IParamTypes.TryGetType(paramName, out T2IParamType type, g.UserInput)
+            && g.UserInput.TryGetRaw(type, out object raw)
+            && raw is not null;
+    }
+
+    private static bool HasNonEmptySisterValue(WorkflowGenerator g, string paramName)
+    {
+        return T2IParamTypes.TryGetType(paramName, out T2IParamType type, g.UserInput)
+            && g.UserInput.TryGetRaw(type, out object raw)
+            && raw is not null
+            && !string.IsNullOrEmpty($"{raw}");
+    }
+
+    private static bool IsVideoGenerationRequest(WorkflowGenerator g)
+    {
+        if (T2IParamTypes.VideoModel?.Type is not null
+            && g.UserInput.TryGetRaw(T2IParamTypes.VideoModel.Type, out object videoModelRaw)
+            && videoModelRaw is not null)
+        {
+            return true;
+        }
+        return g.UserInput.Get(T2IParamTypes.Prompt, "").Contains("<extend:");
+    }
+
+    private static bool SeedVR2UpscalesBeforeVideo(WorkflowGenerator g)
+    {
+        if (!T2IParamTypes.TryGetType(SeedVR2UpscaleStageParamName, out T2IParamType type, g.UserInput)
+            || !g.UserInput.TryGetRaw(type, out object raw)
+            || raw is null)
+        {
+            return false;
+        }
+        string stage = $"{raw}";
+        int sep = stage.IndexOf("///", StringComparison.Ordinal);
+        if (sep >= 0)
+        {
+            stage = stage[..sep];
+        }
+        return StringUtils.Equals(stage.Trim(), "before_video");
     }
 
     private static bool HasRefinerStageConfigured(WorkflowGenerator g)

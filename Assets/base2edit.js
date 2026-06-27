@@ -170,6 +170,9 @@
     },
     getButtonElement: (id) => {
       return document.getElementById(id);
+    },
+    isSeedVr2Available: () => {
+      return !!document.getElementById("input_seedvrmodel") || !!document.getElementById("auto-group-seedvrupscaler");
     }
   };
 
@@ -267,8 +270,11 @@
     }
     return errors;
   };
-  var buildApplyAfterList = (stageIds, stageId, currentVal) => {
+  var buildApplyAfterList = (stageIds, stageId, currentVal, seedVr2Available = false) => {
     const values = ["Refiner"];
+    if (seedVr2Available) {
+      values.push("SeedVR2");
+    }
     const refs = [...stageIds].filter((id) => id < stageId).sort((a, b) => a - b).map((id) => `Edit Stage ${id}`);
     values.push(...refs);
     if (currentVal && !values.includes(currentVal)) {
@@ -276,11 +282,14 @@
     }
     return values;
   };
-  var cleanApplyAfterOptions = (applyElem, stageIds, stageId) => {
+  var cleanApplyAfterOptions = (applyElem, stageIds, stageId, seedVr2Available = false) => {
     const selectedVal = `${applyElem.value}`;
     const isValid = (val) => {
       if (val === "Refiner") {
         return true;
+      }
+      if (val === "SeedVR2") {
+        return seedVr2Available;
       }
       const m = `${val}`.match(/^Edit Stage (\d+)$/);
       if (!m) {
@@ -298,12 +307,15 @@
       if (opt.value === selectedVal) {
         opt.hidden = true;
         opt.disabled = true;
+        if (opt.value === "SeedVR2") {
+          applyElem.value = "Refiner";
+        }
       } else {
         opt.remove();
       }
     }
   };
-  var validateApplyAfter = (prefix, stageIds, stageId) => {
+  var validateApplyAfter = (prefix, stageIds, stageId, seedVr2Available = false) => {
     const applyElem = utils.getSelectElement(`${prefix}applyafter`);
     if (!applyElem) {
       return;
@@ -311,7 +323,7 @@
     applyElem.classList.remove("is-invalid");
     document.getElementById(`${prefix}applyafter_error`)?.remove();
     const val = `${applyElem.value}`;
-    const applyInvalid = isMissingStageRef(val, stageIds) || /^Edit Stage \d+$/.test(val) && parseInt(val.split(" ")[2], 10) >= stageId;
+    const applyInvalid = val === "SeedVR2" && !seedVr2Available || isMissingStageRef(val, stageIds) || /^Edit Stage \d+$/.test(val) && parseInt(val.split(" ")[2], 10) >= stageId;
     if (!applyInvalid) {
       return;
     }
@@ -460,8 +472,14 @@
       const stageIds = [0, ...stages.map((_, i) => i + 1)];
       const applyElem = utils.getSelectElement(`${prefix}applyafter`);
       if (applyElem) {
-        cleanApplyAfterOptions(applyElem, stageIds, stageId);
-        validateApplyAfter(prefix, stageIds, stageId);
+        const seedVr2Available = utils.isSeedVr2Available();
+        cleanApplyAfterOptions(
+          applyElem,
+          stageIds,
+          stageId,
+          seedVr2Available
+        );
+        validateApplyAfter(prefix, stageIds, stageId, seedVr2Available);
       }
     };
     const installStageChangeListener = (editor2) => {
@@ -746,6 +764,7 @@
   var showStages = (editor2, deps) => {
     const stages = deps.getStages();
     const stageIds = [0, ...stages.map((_, idx) => idx + 1)];
+    const seedVr2Available = utils.isSeedVr2Available();
     const list = document.createElement("div");
     list.className = "base2edit-stage-list";
     applyFullWidthLayout(list);
@@ -797,7 +816,8 @@
       const applyAfter = buildApplyAfterList(
         stageIds,
         stageId,
-        stage.applyAfter
+        stage.applyAfter,
+        seedVr2Available
       );
       const parts = buildFieldsForStage(stage, prefix, applyAfter);
       content.insertAdjacentHTML(
@@ -831,8 +851,13 @@
       setToggle("editvae", stage.vae != null && `${stage.vae}` !== "");
       const applyElem = utils.getSelectElement(`${prefix}applyafter`);
       if (applyElem) {
-        cleanApplyAfterOptions(applyElem, stageIds, stageId);
-        validateApplyAfter(prefix, stageIds, stageId);
+        cleanApplyAfterOptions(
+          applyElem,
+          stageIds,
+          stageId,
+          seedVr2Available
+        );
+        validateApplyAfter(prefix, stageIds, stageId, seedVr2Available);
       }
     });
     const addBtn = document.createElement("button");

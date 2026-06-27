@@ -9,6 +9,26 @@ namespace Base2Edit.Tests;
 
 internal static class UnitTestStubs
 {
+    /// <summary>Stub standing in for the SeedVR2 sister extension's "SeedVR2 Model" param, so Base2Edit's
+    /// SeedVR2 detection (which looks up the param by name) can be exercised without that extension loaded.</summary>
+    public static T2IRegisteredParam<string> SeedVR2ModelStub;
+
+    public static void EnsureSeedVR2ModelStubRegistered()
+    {
+        if (SeedVR2ModelStub is not null)
+        {
+            return;
+        }
+
+        SeedVR2ModelStub = T2IParamTypes.Register<string>(new T2IParamType(
+            Name: Base2EditExtension.SeedVR2ModelParamName,
+            Description: "Stub param registered only for unit tests.",
+            Default: "seedvr2-auto",
+            FeatureFlag: "seedvr2_upscaler",
+            GetValues: (_) => ["seedvr2-auto"]
+        ));
+    }
+
     public static void EnsureComfySetClipDeviceRegistered()
     {
         if (ComfyUIBackendExtension.SetClipDevice is not null)

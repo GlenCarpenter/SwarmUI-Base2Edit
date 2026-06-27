@@ -134,6 +134,7 @@ describe("syncSingleStageFromUi (via installStageChangeListener + debounce)", ()
             "base2edit_stage_1_",
             [0, 1, 2],
             1,
+            false,
         );
     });
 

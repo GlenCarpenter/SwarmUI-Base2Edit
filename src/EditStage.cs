@@ -42,6 +42,13 @@ internal readonly record struct ReencodeOptions(
     bool ForceFromCurrentImage = false
 );
 
+internal enum EditPhase
+{
+    Base,
+    Refiner,
+    SeedVR2
+}
+
 public class EditStage
 {
     private const int BranchEditSaveId = 50300;
@@ -64,6 +71,24 @@ public class EditStage
 
     public void Run(bool isFinalStep)
     {
+        RunPhase(isFinalStep ? EditPhase.Refiner : EditPhase.Base);
+    }
+
+    public void RunSeedVR2Phase()
+    {
+        RunPhase(EditPhase.SeedVR2);
+    }
+
+    private void RunPhase(EditPhase phase)
+    {
+        if (phase == EditPhase.SeedVR2)
+        {
+            RunSeedVR2PhaseInternal();
+            return;
+        }
+
+        bool isFinalStep = phase == EditPhase.Refiner;
+
         if (!isFinalStep)
         {
             store.Capture(StageRefStore.StageKind.Base);
@@ -77,8 +102,37 @@ public class EditStage
         }
 
         (List<StageSpec> primaryChain, List<StageSpec> branchRoots) =
-            GetPrimaryChainAndBranchRoots(isFinalStep);
+            GetPrimaryChainAndBranchRoots(isFinalStep ? ParentKind.Refiner : ParentKind.Base);
 
+        RunResolvedChain(primaryChain, branchRoots, isFinalStep, preferCurrentImageAnchor);
+
+        if (isFinalStep)
+        {
+            runner.CleanupDanglingVaeDecodeNodes();
+        }
+    }
+
+    private void RunSeedVR2PhaseInternal()
+    {
+        (List<StageSpec> primaryChain, List<StageSpec> branchRoots) =
+            GetPrimaryChainAndBranchRoots(ParentKind.SeedVR2);
+
+        if (primaryChain.Count == 0 && branchRoots.Count == 0)
+        {
+            return;
+        }
+
+        store.Capture(StageRefStore.StageKind.SeedVR2);
+        RunResolvedChain(primaryChain, branchRoots, isFinalStep: true, preferCurrentImageAnchor: true);
+        runner.CleanupDanglingVaeDecodeNodes();
+    }
+
+    private void RunResolvedChain(
+        List<StageSpec> primaryChain,
+        List<StageSpec> branchRoots,
+        bool isFinalStep,
+        bool preferCurrentImageAnchor)
+    {
         foreach (StageSpec stage in primaryChain)
         {
             RestoreParentPipelineState(stage);
@@ -118,11 +172,6 @@ public class EditStage
                     g.CurrentMedia = WrapImage(primaryImageOut.Path);
                 }
             }
-        }
-
-        if (isFinalStep)
-        {
-            runner.CleanupDanglingVaeDecodeNodes();
         }
     }
 
@@ -178,7 +227,7 @@ public class EditStage
         }
     }
 
-    private (List<StageSpec> PrimaryChain, List<StageSpec> BranchRoots) GetPrimaryChainAndBranchRoots(bool isFinalStep)
+    private (List<StageSpec> PrimaryChain, List<StageSpec> BranchRoots) GetPrimaryChainAndBranchRoots(ParentKind rootKind)
     {
         IReadOnlyList<StageSpec> stages = GetCachedParsedStages();
         if (stages.Count == 0)
@@ -186,7 +235,6 @@ public class EditStage
             return ([], []);
         }
 
-        ParentKind rootKind = isFinalStep ? ParentKind.Refiner : ParentKind.Base;
         List<StageSpec> roots = [.. stages
             .Where(stage => stage.ParentKind == rootKind)
             .OrderBy(stage => stage.Id)];
@@ -364,6 +412,7 @@ public class EditStage
         {
             ParentKind.Base => store.Base,
             ParentKind.Refiner => store.Refiner,
+            ParentKind.SeedVR2 => store.SeedVR2,
             ParentKind.Edit => store.TryGetEditRef(stage.ParentStageId, out StageRefStore.StageRef r) ? r : null,
             _ => null,
         };

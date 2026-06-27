@@ -259,6 +259,7 @@ export const buildFieldsForStage = (
 export const showStages = (editor: HTMLElement, deps: RenderDeps): void => {
     const stages = deps.getStages();
     const stageIds = [0, ...stages.map((_, idx) => idx + 1)];
+    const seedVr2Available = utils.isSeedVr2Available();
     const list = document.createElement("div");
     list.className = "base2edit-stage-list";
     applyFullWidthLayout(list);
@@ -317,6 +318,7 @@ export const showStages = (editor: HTMLElement, deps: RenderDeps): void => {
             stageIds,
             stageId,
             stage.applyAfter,
+            seedVr2Available,
         );
         const parts = buildFieldsForStage(stage, prefix, applyAfter);
 
@@ -353,8 +355,13 @@ export const showStages = (editor: HTMLElement, deps: RenderDeps): void => {
 
         const applyElem = utils.getSelectElement(`${prefix}applyafter`);
         if (applyElem) {
-            cleanApplyAfterOptions(applyElem, stageIds, stageId);
-            validateApplyAfter(prefix, stageIds, stageId);
+            cleanApplyAfterOptions(
+                applyElem,
+                stageIds,
+                stageId,
+                seedVr2Available,
+            );
+            validateApplyAfter(prefix, stageIds, stageId, seedVr2Available);
         }
     });
 

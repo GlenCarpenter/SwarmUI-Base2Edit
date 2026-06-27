@@ -22,6 +22,7 @@ public class StageRefStore(WorkflowGenerator g)
     {
         Base,
         Refiner,
+        SeedVR2,
         Edit,
         Prompt
     }
@@ -43,6 +44,7 @@ public class StageRefStore(WorkflowGenerator g)
     {
         StageKind.Base => "base",
         StageKind.Refiner => "refiner",
+        StageKind.SeedVR2 => "seedvr2",
         StageKind.Edit => $"edit.{index ?? 0}",
         StageKind.Prompt => $"prompt.{index ?? 0}",
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
@@ -134,6 +136,7 @@ public class StageRefStore(WorkflowGenerator g)
 
     public StageRef Base => GetIfCaptured(StageKind.Base);
     public StageRef Refiner => GetIfCaptured(StageKind.Refiner);
+    public StageRef SeedVR2 => GetIfCaptured(StageKind.SeedVR2);
 
     public void Capture(StageKind stage, int? index = null)
     {

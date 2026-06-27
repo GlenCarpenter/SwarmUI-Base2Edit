@@ -39,8 +39,12 @@ export const buildApplyAfterList = (
     stageIds: number[],
     stageId: number,
     currentVal: string,
+    seedVr2Available = false,
 ): string[] => {
     const values = ["Refiner"];
+    if (seedVr2Available) {
+        values.push("SeedVR2");
+    }
     const refs = [...stageIds]
         .filter((id) => id < stageId)
         .sort((a, b) => a - b)
@@ -58,11 +62,16 @@ export const cleanApplyAfterOptions = (
     applyElem: HTMLSelectElement,
     stageIds: number[],
     stageId: number,
+    seedVr2Available = false,
 ): void => {
     const selectedVal = `${applyElem.value}`;
     const isValid = (val: string) => {
         if (val === "Refiner") {
             return true;
+        }
+
+        if (val === "SeedVR2") {
+            return seedVr2Available;
         }
 
         const m = `${val}`.match(/^Edit Stage (\d+)$/);
@@ -84,6 +93,9 @@ export const cleanApplyAfterOptions = (
         if (opt.value === selectedVal) {
             opt.hidden = true;
             opt.disabled = true;
+            if (opt.value === "SeedVR2") {
+                applyElem.value = "Refiner";
+            }
         } else {
             opt.remove();
         }
@@ -94,6 +106,7 @@ export const validateApplyAfter = (
     prefix: string,
     stageIds: number[],
     stageId: number,
+    seedVr2Available = false,
 ): void => {
     const applyElem = utils.getSelectElement(`${prefix}applyafter`);
     if (!applyElem) {
@@ -105,6 +118,7 @@ export const validateApplyAfter = (
 
     const val = `${applyElem.value}`;
     const applyInvalid =
+        (val === "SeedVR2" && !seedVr2Available) ||
         isMissingStageRef(val, stageIds) ||
         (/^Edit Stage \d+$/.test(val) &&
             parseInt(val.split(" ")[2], 10) >= stageId);

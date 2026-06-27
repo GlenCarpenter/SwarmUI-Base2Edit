@@ -4,7 +4,7 @@ namespace Base2Edit;
 
 public enum ModelSource { Base, Refiner, Specific }
 
-public enum ParentKind { Base, Refiner, Edit }
+public enum ParentKind { Base, Refiner, Edit, SeedVR2 }
 
 public sealed record StageSpec(
     int Id,

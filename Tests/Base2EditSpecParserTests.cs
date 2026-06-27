@@ -355,4 +355,70 @@ public class Base2EditSpecParserTests
             () => Base2EditSpecParser.Parse(MakeGenerator(input)));
         Assert.Contains("missing required field 'Model'", ex.Message);
     }
+
+    [Fact]
+    public void Stage0_applyAfterSeedVR2_whenSeedVR2Enabled_isSeedVR2Kind()
+    {
+        using SwarmUiTestContext _ = new();
+        UnitTestStubs.EnsureSeedVR2ModelStubRegistered();
+        T2IParamInput input = BuildBaseInput();
+        input.Set(Base2EditExtension.EditModel, ModelPrep.UseBase);
+        input.Set(Base2EditExtension.ApplyEditAfter, "SeedVR2");
+        input.Set(UnitTestStubs.SeedVR2ModelStub, "seedvr2-auto");
+
+        StageSpec stage0 = ParseStage0(input);
+
+        Assert.Equal(ParentKind.SeedVR2, stage0.ParentKind);
+    }
+
+    [Fact]
+    public void Stage0_applyAfterSeedVR2_whenSeedVR2Disabled_downgradesToBase()
+    {
+        using SwarmUiTestContext _ = new();
+        UnitTestStubs.EnsureSeedVR2ModelStubRegistered();
+        T2IParamInput input = BuildBaseInput();
+        input.Set(Base2EditExtension.EditModel, ModelPrep.UseBase);
+        input.Set(Base2EditExtension.ApplyEditAfter, "SeedVR2");
+        // SeedVR2 model value intentionally unset -> group disabled -> downgrade SeedVR2 -> Refiner -> Base.
+
+        StageSpec stage0 = ParseStage0(input);
+
+        Assert.Equal(ParentKind.Base, stage0.ParentKind);
+    }
+
+    [Fact]
+    public void EditStage_applyAfterSeedVR2_whenSeedVR2Enabled_isSeedVR2Kind()
+    {
+        using SwarmUiTestContext _ = new();
+        UnitTestStubs.EnsureSeedVR2ModelStubRegistered();
+        T2IParamInput input = BuildBaseInput();
+        input.Set(Base2EditExtension.EditModel, ModelPrep.UseBase);
+        input.Set(UnitTestStubs.SeedVR2ModelStub, "seedvr2-auto");
+        input.Set(Base2EditExtension.EditStages,
+            "[{\"ApplyAfter\":\"SeedVR2\",\"Model\":\"" + ModelPrep.UseBase + "\"}]");
+
+        List<StageSpec> stages = Base2EditSpecParser.Parse(MakeGenerator(input));
+        StageSpec stage1 = stages.Single(s => s.Id == 1);
+
+        Assert.Equal(ParentKind.SeedVR2, stage1.ParentKind);
+    }
+
+    [Fact]
+    public void Stage0_applyAfterSeedVR2_videoGenerationAfterVideo_downgrades()
+    {
+        using SwarmUiTestContext _ = new();
+        UnitTestStubs.EnsureSeedVR2ModelStubRegistered();
+        T2IParamInput input = BuildBaseInput();
+        input.Set(Base2EditExtension.EditModel, ModelPrep.UseBase);
+        input.Set(Base2EditExtension.ApplyEditAfter, "SeedVR2");
+        input.Set(UnitTestStubs.SeedVR2ModelStub, "seedvr2-auto");
+        // Video generation with the default "after_video" upscale stage: the sister's priority-6
+        // image upscale does not run (it defers to priority 15), so the SeedVR2 anchor must
+        // downgrade through Refiner -> Base (no refiner configured here).
+        input.Set(T2IParamTypes.Prompt, "test <extend:1>");
+
+        StageSpec stage0 = ParseStage0(input);
+
+        Assert.Equal(ParentKind.Base, stage0.ParentKind);
+    }
 }

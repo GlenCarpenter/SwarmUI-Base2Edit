@@ -237,6 +237,125 @@ public class WorkflowTests
     }
 
     [Fact]
+    public void ApplyEditAfter_SeedVR2_injects_edit_after_seedvr2_upscale()
+    {
+        UnitTestStubs.EnsureSeedVR2ModelStubRegistered();
+        T2IParamInput input = BuildEditInput("SeedVR2");
+        input.Set(Base2EditExtension.EditModel, ModelPrep.UseBase);
+        // Mark the SeedVR2 group as enabled for this generation so the stage keeps its SeedVR2 anchor.
+        input.Set(UnitTestStubs.SeedVR2ModelStub, "seedvr2-auto");
+
+        IEnumerable<WorkflowGenerator.WorkflowGenStep> steps =
+            new[]
+            {
+                WorkflowTestHarness.MinimalGraphSeedStep(),
+                WorkflowTestHarness.DecodeSamplesToImageStep(),
+                // Stand in for the SeedVR2 image upscale, which runs at priority 6.
+                new WorkflowGenerator.WorkflowGenStep(g =>
+                {
+                    WGNodeData image = g.CurrentMedia.AsRawImage(g.CurrentVae);
+                    string upscale = g.CreateNode("UnitTest_SeedVR2Upscale", new JObject()
+                    {
+                        ["image"] = image.Path
+                    }, id: "900", idMandatory: false);
+                    g.CurrentMedia = new WGNodeData([upscale, 0], g, WGNodeData.DT_IMAGE, g.CurrentCompat());
+                }, 6)
+            }
+            .Concat(WorkflowTestHarness.Base2EditSteps());
+
+        (JObject workflow, WorkflowGenerator generator) = WorkflowTestHarness.GenerateWithStepsAndState(input, steps);
+        using WorkflowBridge bridge = WorkflowBridge.Create(workflow);
+
+        // The edit re-encodes the SeedVR2-upscaled image (node 900), proving it runs AFTER the upscale.
+        KSamplerAdvancedNode sampler = WorkflowAssertions.RequireNodeOfType<KSamplerAdvancedNode>(bridge);
+        VAEEncodeNode encode = Assert.IsType<VAEEncodeNode>(sampler.LatentImage.Connection?.Node);
+        Assert.Equal("900", $"{encode.Inputs.Single(i => i.Name == "pixels").Connection?.Node.Id}");
+
+        // The final image is the edit's decode, so SaveImage (priority 10) persists the post-SeedVR2 edit.
+        VAEDecodeNode postEditDecode = WorkflowAssertions.RequireSingleVaeDecodeBySamples(bridge, sampler.Outputs[0]);
+        Assert.Equal(new JArray(postEditDecode.Id, 0), generator.CurrentMedia.Path);
+    }
+
+    [Fact]
+    public void ApplyEditAfter_SeedVR2_twoRoots_eachAnchorToUpscaledImage_notFirstEdit()
+    {
+        UnitTestStubs.EnsureSeedVR2ModelStubRegistered();
+        T2IParamInput input = BuildEditInput("SeedVR2");
+        input.Set(Base2EditExtension.EditModel, ModelPrep.UseBase);
+        input.Set(UnitTestStubs.SeedVR2ModelStub, "seedvr2-auto");
+        // A second root edit stage, also anchored after SeedVR2: both must branch from the upscale.
+        input.Set(Base2EditExtension.EditStages,
+            "[{\"ApplyAfter\":\"SeedVR2\",\"Model\":\"" + ModelPrep.UseBase + "\"}]");
+
+        IEnumerable<WorkflowGenerator.WorkflowGenStep> steps =
+            new[]
+            {
+                WorkflowTestHarness.MinimalGraphSeedStep(),
+                WorkflowTestHarness.DecodeSamplesToImageStep(),
+                // Stand in for the SeedVR2 image upscale, which runs at priority 6.
+                new WorkflowGenerator.WorkflowGenStep(g =>
+                {
+                    WGNodeData image = g.CurrentMedia.AsRawImage(g.CurrentVae);
+                    string upscale = g.CreateNode("UnitTest_SeedVR2Upscale", new JObject()
+                    {
+                        ["image"] = image.Path
+                    }, id: "900", idMandatory: false);
+                    g.CurrentMedia = new WGNodeData([upscale, 0], g, WGNodeData.DT_IMAGE, g.CurrentCompat());
+                }, 6)
+            }
+            .Concat(WorkflowTestHarness.Base2EditSteps());
+
+        (JObject workflow, _) = WorkflowTestHarness.GenerateWithStepsAndState(input, steps);
+        using WorkflowBridge bridge = WorkflowBridge.Create(workflow);
+
+        // Both SeedVR2-rooted edit stages run (one sampler each).
+        IReadOnlyList<KSamplerAdvancedNode> samplers = bridge.Graph.NodesOfType<KSamplerAdvancedNode>();
+        Assert.Equal(2, samplers.Count);
+
+        // Each edit sampler re-encodes the SeedVR2-upscaled image (node 900): both roots branch from
+        // the upscale. With the multi-root anchor bug the second root would instead sample from a
+        // VAEEncode of the first stage's edit decode.
+        foreach (KSamplerAdvancedNode sampler in samplers)
+        {
+            VAEEncodeNode encode = Assert.IsType<VAEEncodeNode>(sampler.LatentImage.Connection?.Node);
+            Assert.Equal("900", $"{encode.Inputs.Single(i => i.Name == "pixels").Connection?.Node.Id}");
+        }
+    }
+
+    [Fact]
+    public void ApplyEditAfter_SeedVR2_disabledWithRefiner_runsInRefinerPhase_notSeedVR2Phase()
+    {
+        UnitTestStubs.EnsureSeedVR2ModelStubRegistered();
+        T2IParamInput input = BuildEditInput("SeedVR2");
+        input.Set(Base2EditExtension.EditModel, ModelPrep.UseBase);
+        // SeedVR2 installed but NOT enabled for this generation (model value unset), with a refiner
+        // configured: the SeedVR2 anchor must downgrade to the Refiner phase (priority 5.9).
+        input.Set(T2IParamTypes.RefinerMethod, "PostApply");
+        input.Set(T2IParamTypes.RefinerControl, 0.2);
+
+        int editSamplersBeforeSeedVr2Phase = -1;
+        WorkflowGenerator.WorkflowGenStep probe = new(g =>
+        {
+            using WorkflowBridge probeBridge = WorkflowBridge.Create(g.Workflow);
+            editSamplersBeforeSeedVr2Phase = probeBridge.Graph.NodesOfType<KSamplerAdvancedNode>().Count;
+        }, 6.2);
+
+        IEnumerable<WorkflowGenerator.WorkflowGenStep> steps =
+            WorkflowTestHarness.Template_BaseThenRefiner()
+                .Concat(WorkflowTestHarness.Base2EditSteps())
+                .Concat(new[] { probe });
+
+        JObject workflow = WorkflowTestHarness.GenerateWithSteps(input, steps);
+
+        // The edit already exists before the priority-6.5 SeedVR2 phase, i.e. it ran at the refiner phase.
+        Assert.Equal(1, editSamplersBeforeSeedVr2Phase);
+
+        // Exactly one edit overall: it did not also (or instead) run in the SeedVR2 phase.
+        using WorkflowBridge bridge = WorkflowBridge.Create(workflow);
+        Assert.Single(bridge.Graph.NodesOfType<KSamplerAdvancedNode>());
+    }
+
+    [Fact]
     public void EditStage_refiner_hook_infers_downstream_tail_when_final_imageout_was_not_set()
     {
         T2IParamInput input = BuildEditInput("Refiner");

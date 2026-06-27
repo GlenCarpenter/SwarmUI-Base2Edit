@@ -33,8 +33,8 @@ global prompt
 ```
 
 You can choose when the edit happens:
-- **After Base** - Edit right after the initial generation, before any upscaling or refining
-- **After Refiner** - Edit the final image after all other stages are done
+- **After Refiner** - Edit the final image after the base/refiner stage is done
+- **After SeedVR2** - Edit the image *after* the [SeedVR2 Upscaler](https://github.com/jtreminio/SwarmUI-SeedVR2Upscaler) sister extension has upscaled it. This option only appears when that extension is installed: stage 0 gains a visible **Apply Edit After** dropdown (Refiner / SeedVR2), and every other stage's **Apply After** dropdown gains a **SeedVR2** entry. If SeedVR2 is not actually enabled for a given generation, the stage falls back to editing after the Refiner.
 
 When two or more edit stages share the same start (e.g. both "After Refiner"), they run **in parallel** from that point: each branch gets the same input image, runs its own edit, and only the **first** stage (lowest ID) continues into the rest of the pipeline. The other branches save their output and stop, so you get multiple edited variants from one run without chaining them.
 
@@ -57,7 +57,7 @@ The base model (and refiner if you enabled it) generates the girl, then the edit
 ## Options
 
 - **Keep Pre-Edit Image** - Save the image before editing so you can compare
-- **Apply Edit After** - Choose to edit after Base or after Refiner
+- **Apply Edit After** - Choose when the edit runs (defaults to after the Refiner). Hidden unless the SeedVR2 Upscaler extension is installed, in which case you can pick Refiner or SeedVR2
 - **Edit Control** - How strongly to apply the edit (1.0 = full effect, lower = more subtle)
 
 ### Edit Overrides

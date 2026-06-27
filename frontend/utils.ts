@@ -8,4 +8,10 @@ export const utils = {
     getButtonElement: (id: string): HTMLButtonElement | null => {
         return document.getElementById(id) as HTMLButtonElement | null;
     },
+    isSeedVr2Available: (): boolean => {
+        return (
+            !!document.getElementById("input_seedvrmodel") ||
+            !!document.getElementById("auto-group-seedvrupscaler")
+        );
+    },
 };

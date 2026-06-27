@@ -131,8 +131,14 @@ export const createObservers = (deps: ObserversDeps): ObserversApi => {
         const stageIds = [0, ...stages.map((_, i) => i + 1)];
         const applyElem = utils.getSelectElement(`${prefix}applyafter`);
         if (applyElem) {
-            cleanApplyAfterOptions(applyElem, stageIds, stageId);
-            validateApplyAfter(prefix, stageIds, stageId);
+            const seedVr2Available = utils.isSeedVr2Available();
+            cleanApplyAfterOptions(
+                applyElem,
+                stageIds,
+                stageId,
+                seedVr2Available,
+            );
+            validateApplyAfter(prefix, stageIds, stageId, seedVr2Available);
         }
     };
 

@@ -66,4 +66,46 @@ describe("buildApplyAfterList", () => {
     it("returns only Refiner when stageIds is empty", () => {
         expect(buildApplyAfterList([], 1, "")).toEqual(["Refiner"]);
     });
+
+    it("omits SeedVR2 by default (seedVr2Available defaults false)", () => {
+        expect(buildApplyAfterList([1, 2, 3], 3, "")).toEqual([
+            "Refiner",
+            "Edit Stage 1",
+            "Edit Stage 2",
+        ]);
+    });
+
+    it("inserts SeedVR2 right after Refiner when available", () => {
+        expect(buildApplyAfterList([1, 2, 3], 3, "", true)).toEqual([
+            "Refiner",
+            "SeedVR2",
+            "Edit Stage 1",
+            "Edit Stage 2",
+        ]);
+    });
+
+    it("returns Refiner and SeedVR2 only when no earlier stage ids and available", () => {
+        expect(buildApplyAfterList([1, 2, 3], 1, "", true)).toEqual([
+            "Refiner",
+            "SeedVR2",
+        ]);
+    });
+
+    it("does not duplicate SeedVR2 when currentVal is SeedVR2 and available", () => {
+        expect(buildApplyAfterList([1, 2, 3], 3, "SeedVR2", true)).toEqual([
+            "Refiner",
+            "SeedVR2",
+            "Edit Stage 1",
+            "Edit Stage 2",
+        ]);
+    });
+
+    it("prepends stale SeedVR2 currentVal when not available", () => {
+        expect(buildApplyAfterList([1, 2, 3], 3, "SeedVR2", false)).toEqual([
+            "SeedVR2",
+            "Refiner",
+            "Edit Stage 1",
+            "Edit Stage 2",
+        ]);
+    });
 });
