@@ -924,6 +924,47 @@ class StageRunner(WorkflowGenerator g, StageRefStore store)
             return (width, height);
         }
 
+        if (upscaleMethod.StartsWith("pidmodel-", StringComparison.OrdinalIgnoreCase))
+        {
+            if (g.CurrentMedia is null || stageVae is null)
+            {
+                return (baseWidth, baseHeight);
+            }
+            T2IModel pidModel = ComfyUIBackendExtension.GetPidModel(upscaleMethod["pidmodel-".Length..], g.UserInput.SourceSession);
+            WGNodeData decoded = g.CreatePixelDecode(pidModel, g.CurrentMedia, stageVae, ctx.Stage.Seed + 2);
+
+            using WorkflowBridge bridge = BridgeSync.For(g);
+            JArray upscaledImageRef = decoded.Path;
+            if (decoded.Width != width || decoded.Height != height)
+            {
+                ImageScaleNode scaledPid = bridge.AddNode(new ImageScaleNode().With(
+                    Width: width,
+                    Height: height,
+                    UpscaleMethod: ImageScaleNode.UpscaleMethodValues.Lanczos,
+                    Crop: ImageScaleNode.CropValues.Disabled));
+                scaledPid.Image.ConnectFromPath(bridge, decoded.Path);
+                upscaledImageRef = scaledPid.IMAGE.ToPath();
+            }
+
+            g.CurrentMedia = new WGNodeData(upscaledImageRef, g, WGNodeData.DT_IMAGE, g.CurrentCompat())
+            {
+                Width = width,
+                Height = height
+            };
+
+            if (VaeNodeReuse.ReuseVaeEncodeForImage(g, upscaledImageRef, stageVae.Path, out INodeOutput reusedPidSamples))
+            {
+                g.CurrentMedia = reusedPidSamples.ToWGNodeData(g, WGNodeData.DT_LATENT_IMAGE);
+            }
+            else
+            {
+                g.CurrentMedia = g.CurrentMedia.EncodeToLatent(stageVae);
+            }
+            g.CurrentMedia.Width = width;
+            g.CurrentMedia.Height = height;
+            return (width, height);
+        }
+
         return (baseWidth, baseHeight);
     }
 }

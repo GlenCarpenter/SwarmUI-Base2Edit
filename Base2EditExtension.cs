@@ -190,7 +190,7 @@ public class Base2EditExtension : Extension
             FeatureFlag: "comfyui",
             CanSectionalize: true,
             ChangeWeight: 1,
-            GetValues: (_) => ComfyUIBackendExtension.UpscalerModels,
+            GetValues: (session) => [.. ComfyUIBackendExtension.UpscalerModels, .. ComfyUIBackendExtension.PidUpscaleModels(session)],
             DependNonDefault: EditUpscale.Type.ID
         ));
 
